@@ -1,0 +1,29 @@
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #dbd3d3d2;
+  /* background: radial-gradient(circle at 50% 50%, #290b5b, #26164d, #23193f, #1e1932, #181625, #111017, #070708, #000); */
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0px;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;  
+}
+
+canvas {
+  display: block;
+  width: 50vw;
+  height: 100vh;
+}
