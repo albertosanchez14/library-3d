@@ -12,7 +12,7 @@ const BOOKSHELF_POSITIONS = [
 
 const bookshelves = [];
 const books = [];
-const bookshelfTopSurfaces = []; 
+const bookshelfTopSurfaces = [];
 
 const canvas = document.getElementById("canvas");
 
@@ -81,9 +81,9 @@ loader.load(
         opacity: 0.7,
       });
       const boundingBox = new THREE.Mesh(boxGeometry, boxMaterial);
-      // Position the box at the calculated center
       boundingBox.position.copy(center);
       scene.add(boundingBox);
+      //////////////////////////////////////////////////////////////////////
 
       // TODO: Debug only - add a visual indicator for the top position
       const topIndicatorGeometry = new THREE.SphereGeometry(0.05, 8, 8);
@@ -96,6 +96,7 @@ loader.load(
       );
       topIndicator.position.copy(topPosition);
       scene.add(topIndicator);
+      //////////////////////////////////////////////////////////////////
     }
   },
   (progress) => {
@@ -147,22 +148,11 @@ controls.enabled = true; // Ensure controls are enabled initially
 // Snapping configuration
 const SNAP_MARGIN = 0.5;
 // Function to find the nearest bookshelf top surface for snapping
-function findNearestBookshelfTop(position, bookGroup = null) {
+function findNearestBookshelfTop(position, book) {
   let nearestShelf = null;
   let minDistance = Infinity;
-
-  // Get book height to calculate bottom position
-  let bookHeight = 0.22; // Default height
-  if (bookGroup) {
-    const book = books.find((b) => b.getGroup() === bookGroup);
-    if (book) {
-      bookHeight = book.height;
-    }
-  }
-
   // Calculate the bottom position of the book
-  const bookBottomY = position.y - bookHeight / 2;
-
+  const bookBottomY = position.y - book.height / 2;
   for (const shelf of bookshelfTopSurfaces) {
     // Check if the book is within the horizontal bounds of the bookshelf
     if (
@@ -173,7 +163,6 @@ function findNearestBookshelfTop(position, bookGroup = null) {
     ) {
       // Calculate vertical distance from book bottom to the top surface
       const distance = Math.abs(bookBottomY - shelf.topY);
-
       // If within snap margin and closer than previous candidates
       if (distance <= SNAP_MARGIN && distance < minDistance) {
         minDistance = distance;
@@ -181,7 +170,6 @@ function findNearestBookshelfTop(position, bookGroup = null) {
       }
     }
   }
-
   return nearestShelf;
 }
 // Function to snap book to bookshelf top
@@ -203,7 +191,7 @@ const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 let isDragging = false;
 let dragObject = null;
-let dragOffset = new THREE.Vector3();
+let bookDragged = null;
 // Mouse event handlers
 function onMouseDown(event) {
   // Update mouse coordinates
@@ -222,20 +210,15 @@ function onMouseDown(event) {
       dragObject = dragObject.parent;
     }
     if (dragObject) {
-      // Calculate offset from click point to object center
-      const intersectionPoint = intersects[0].point;
-      dragOffset.copy(intersectionPoint).sub(dragObject.position);
-      // Disable orbit controls while dragging
+      bookDragged = books.find((b) => b.getGroup() === dragObject);
       controls.enabled = false;
     }
   }
 }
 function onMouseMove(event) {
   if (!isDragging || !dragObject) return;
-  // Update mouse coordinates
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-  // Update raycaster
   raycaster.setFromCamera(mouse, camera);
   // Create a plane at the current z position of the dragged object
   const plane = new THREE.Plane(
@@ -245,30 +228,54 @@ function onMouseMove(event) {
   const intersectionPoint = new THREE.Vector3();
   if (raycaster.ray.intersectPlane(plane, intersectionPoint)) {
     // Update position only on x and y axes
-    const newX = intersectionPoint.x - dragOffset.x;
-    const newY = intersectionPoint.y - dragOffset.y;
+    const newX = intersectionPoint.x;
+    const newY = intersectionPoint.y;
+    const originalPosition = dragObject.position.clone();
+    // Moving along x axis
     dragObject.position.x = newX;
+    if (bookCollidingWithShelves(dragObject)) {
+      dragObject.position.x = originalPosition.x;
+    }
+    // Moving along y axis
     dragObject.position.y = newY;
+    if (bookCollidingWithShelves(dragObject)) {
+      dragObject.position.y = originalPosition.y;
+    }
+    if (!bookCollidingWithShelves(dragObject)) {
+      const nearestShelfTop = findNearestBookshelfTop(
+        dragObject.position,
+        bookDragged
+      );
+      if (nearestShelfTop) {
+        snapToBookshelfTop(dragObject, nearestShelfTop);
+      }
+    }
   }
 }
-
-function onMouseUp(event) {
+function onMouseUp() {
   if (isDragging) {
-    // Find the nearest bookshelf top surface for snapping
-    const nearestShelf = findNearestBookshelfTop(
-      dragObject.position,
-      dragObject
-    );
     isDragging = false;
-    if (nearestShelf) {
-      // Snap the book to the bookshelf top
-      snapToBookshelfTop(dragObject, nearestShelf);
-    }
-    // Re-enable orbit controls
     controls.enabled = true;
   }
 }
 
+function bookCollidingWithShelves(bookGroup) {
+  // Find nearest bookshelf
+  let nearestShelf = null;
+  let minDistance = Infinity;
+  for (const shelf of bookshelfTopSurfaces) {
+    const distance = bookGroup.position.distanceTo(shelf.center);
+    if (distance < minDistance) {
+      minDistance = distance;
+      nearestShelf = shelf;
+    }
+  }
+  if (!nearestShelf) return false;
+  // Check bounding box intersection
+  const bookBox = new THREE.Box3().setFromObject(bookGroup);
+  const shelfBox = new THREE.Box3().setFromObject(nearestShelf.bookshelf);
+  return bookBox.intersectsBox(shelfBox);
+}
 // Add event listeners for drag functionality
 renderer.domElement.addEventListener("mousedown", onMouseDown);
 renderer.domElement.addEventListener("mousemove", onMouseMove);
