@@ -211,10 +211,14 @@ function onMouseDown(event) {
     }
     if (dragObject) {
       bookDragged = books.find((b) => b.getGroup() === dragObject);
+      const bookBox = new THREE.Box3().setFromObject(dragObject);
+      scene.add(new THREE.Box3Helper(bookBox, 0x0000ff)); 
+      console.log("Started dragging book:", bookDragged);
       controls.enabled = false;
     }
   }
 }
+
 function onMouseMove(event) {
   if (!isDragging || !dragObject) return;
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -234,21 +238,21 @@ function onMouseMove(event) {
     // Moving along x axis
     dragObject.position.x = newX;
     if (bookCollidingWithShelves(dragObject)) {
+      console.log("Collision detected on X axis");
       dragObject.position.x = originalPosition.x;
     }
     // Moving along y axis
     dragObject.position.y = newY;
     if (bookCollidingWithShelves(dragObject)) {
+      console.log("Collision detected on Y axis");
       dragObject.position.y = originalPosition.y;
     }
-    if (!bookCollidingWithShelves(dragObject)) {
-      const nearestShelfTop = findNearestBookshelfTop(
-        dragObject.position,
-        bookDragged
-      );
-      if (nearestShelfTop) {
-        snapToBookshelfTop(dragObject, nearestShelfTop);
-      }
+    const nearestShelfTop = findNearestBookshelfTop(
+      dragObject.position,
+      bookDragged
+    );
+    if (nearestShelfTop) {
+      snapToBookshelfTop(dragObject, nearestShelfTop);
     }
   }
 }
@@ -271,10 +275,113 @@ function bookCollidingWithShelves(bookGroup) {
     }
   }
   if (!nearestShelf) return false;
-  // Check bounding box intersection
-  const bookBox = new THREE.Box3().setFromObject(bookGroup);
+
+  // Get the shelf bounding box
   const shelfBox = new THREE.Box3().setFromObject(nearestShelf.bookshelf);
-  return bookBox.intersectsBox(shelfBox);
+  
+  // Check collision for each part of the book
+  let hasCollision = false;
+  const collisionResults = {
+    frontCover: false,
+    backCover: false,
+    spine: false,
+    pages: false,
+    overall: false
+  };
+
+  // Find the book instance to get component references
+  const book = books.find((b) => b.getGroup() === bookGroup);
+  if (!book) {
+    console.log("Book instance not found");
+    return false;
+  }
+
+  // Check overall book bounding box
+  const bookBox = new THREE.Box3().setFromObject(bookGroup);
+  collisionResults.overall = bookBox.intersectsBox(shelfBox);
+  
+  // Check individual components
+  if (book.frontCover) {
+    const frontCoverBox = new THREE.Box3().setFromObject(book.frontCover);
+    collisionResults.frontCover = frontCoverBox.intersectsBox(shelfBox);
+    if (collisionResults.frontCover) {
+      console.log("🔴 Front cover collision detected");
+      console.log("Front cover box:", frontCoverBox);
+      hasCollision = true;
+    }
+  }
+
+  if (book.backCover) {
+    const backCoverBox = new THREE.Box3().setFromObject(book.backCover);
+    collisionResults.backCover = backCoverBox.intersectsBox(shelfBox);
+    if (collisionResults.backCover) {
+      console.log("🔴 Back cover collision detected");
+      console.log("Back cover box:", backCoverBox);
+      hasCollision = true;
+    }
+  }
+
+  if (book.spine) {
+    const spineBox = new THREE.Box3().setFromObject(book.spine);
+    collisionResults.spine = spineBox.intersectsBox(shelfBox);
+    if (collisionResults.spine) {
+      console.log("🔴 Spine collision detected");
+      console.log("Spine box:", spineBox);
+      hasCollision = true;
+    }
+  }
+
+  if (book.pages) {
+    const pagesBox = new THREE.Box3().setFromObject(book.pages);
+    collisionResults.pages = pagesBox.intersectsBox(shelfBox);
+    if (collisionResults.pages) {
+      console.log("🔴 Pages collision detected");
+      console.log("Pages box:", pagesBox);
+      hasCollision = true;
+    }
+  }
+
+  if (hasCollision) {
+    console.log("📊 Collision Summary:", collisionResults);
+    console.log("📐 Book dimensions:", {
+      width: book.width,
+      height: book.height,
+      thickness: book.thickness
+    });
+    console.log("📍 Book position:", bookGroup.position);
+    console.log("🔄 Book rotation:", bookGroup.rotation);
+    console.log("📦 Book bounding box:", bookBox);
+    console.log("🏠 Shelf bounding box:", shelfBox);
+    
+    // Add visual debug helpers for colliding components
+    const debugColor = 0xff0000;
+    if (collisionResults.frontCover && book.frontCover) {
+      const frontBox = new THREE.Box3().setFromObject(book.frontCover);
+      const helper = new THREE.Box3Helper(frontBox, debugColor);
+      scene.add(helper);
+      setTimeout(() => scene.remove(helper), 2000); // Remove after 2 seconds
+    }
+    if (collisionResults.backCover && book.backCover) {
+      const backBox = new THREE.Box3().setFromObject(book.backCover);
+      const helper = new THREE.Box3Helper(backBox, debugColor);
+      scene.add(helper);
+      setTimeout(() => scene.remove(helper), 2000);
+    }
+    if (collisionResults.spine && book.spine) {
+      const spineBox = new THREE.Box3().setFromObject(book.spine);
+      const helper = new THREE.Box3Helper(spineBox, debugColor);
+      scene.add(helper);
+      setTimeout(() => scene.remove(helper), 2000);
+    }
+    if (collisionResults.pages && book.pages) {
+      const pagesBox = new THREE.Box3().setFromObject(book.pages);
+      const helper = new THREE.Box3Helper(pagesBox, debugColor);
+      scene.add(helper);
+      setTimeout(() => scene.remove(helper), 2000);
+    }
+  }
+
+  return hasCollision;
 }
 // Add event listeners for drag functionality
 renderer.domElement.addEventListener("mousedown", onMouseDown);
@@ -327,4 +434,72 @@ window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Add new book functionality
+function createRandomBook() {
+  // Generate random book properties
+  const colors = [
+    "#8B4513",
+    "#CD853F",
+    "#D2691E",
+    "#A0522D",
+    "#8B0000",
+    "#2F4F4F",
+    "#191970",
+    "#800080",
+    "#006400",
+    "#8B008B",
+  ];
+  const titles = [
+    "Adventure Tales",
+    "Mystery Novel",
+    "Science Guide",
+    "History Book",
+    "Poetry Collection",
+    "Art Masterpiece",
+    "Philosophy",
+    "Biography",
+    "Cookbook",
+    "Travel Journal",
+    "Fiction Story",
+    "Technical Manual",
+  ];
+
+  const randomColor = colors[Math.floor(Math.random() * colors.length)];
+  const randomTitle = titles[Math.floor(Math.random() * titles.length)];
+  const randomWidth = 0.15 + Math.random() * 0.1; // 0.15 to 0.25
+  const randomHeight = 0.8 + Math.random() * 0.4; // 0.8 to 1.2
+  const randomThickness = 0.2 + Math.random() * 0.2; // 0.2 to 0.4
+
+  const newBook = new Book({
+    width: randomWidth,
+    height: randomHeight,
+    thickness: randomThickness,
+    color: randomColor,
+    title: randomTitle,
+  });
+  // Add to scene and position randomly
+  newBook.addToScene(scene);
+  const randomX = -3 + Math.random() * 6; // -3 to 3
+  const randomY = 2 + Math.random() * 2; // 2 to 4 (above the shelves)
+  const randomZ = 0;
+  newBook.setPosition(randomX, randomY, randomZ);
+  newBook.setRotation(0, Math.PI / 2, 0);
+
+  // Add to books array
+  books.push(newBook);
+  console.log(
+    `Added new book: "${randomTitle}" at position (${randomX.toFixed(
+      2
+    )}, ${randomY.toFixed(2)}, ${randomZ.toFixed(2)})`
+  );
+}
+
+// Add event listener for the add book button
+document.addEventListener("DOMContentLoaded", () => {
+  const addBookBtn = document.getElementById("addBookBtn");
+  if (addBookBtn) {
+    addBookBtn.addEventListener("click", createRandomBook);
+  }
 });

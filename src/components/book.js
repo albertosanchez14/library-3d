@@ -52,19 +52,15 @@ export class Book {
   }
 
   createSpine() {
-    // Spine geometry
     const spineGeometry = new THREE.BoxGeometry(
       this.thickness,
       this.height,
       0.002
     );
-
-    // Spine material - usually darker than cover
     const spineMaterial = new THREE.MeshLambertMaterial({
       color: this.spineColor,
       roughness: 0.9,
     });
-
     const spine = new THREE.Mesh(spineGeometry, spineMaterial);
     spine.position.set(-this.width / 2, 0, 0);
     spine.rotation.y = Math.PI / 2;

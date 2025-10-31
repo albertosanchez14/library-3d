@@ -27,3 +27,35 @@ canvas {
   width: 50vw;
   height: 100vh;
 }
+
+.controls {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+}
+
+.add-book-btn {
+  background: linear-gradient(135deg, #8B4513, #A0522D);
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(139, 69, 19, 0.3);
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.add-book-btn:hover {
+  background: linear-gradient(135deg, #A0522D, #CD853F);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(139, 69, 19, 0.4);
+}
+
+.add-book-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(139, 69, 19, 0.3);
+}
