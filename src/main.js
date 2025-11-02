@@ -177,11 +177,8 @@ function snapToBookshelfTop(bookGroup, shelf) {
   // Find the book instance to get its height
   const book = books.find((b) => b.getGroup() === bookGroup);
   if (book) {
-    // Position the book so its bottom touches the bookshelf top surface
-    // Since the book's position is at its center, we need to add half its height
-    bookGroup.position.y = shelf.topY + book.height / 2;
+    bookGroup.position.y = shelf.topY + book.height / 2 + 0.001; // SOME BOOKS COLLIDE WITH THE X axis
   } else {
-    // Fallback if book instance not found
     bookGroup.position.y = shelf.topY;
   }
 }
@@ -211,8 +208,6 @@ function onMouseDown(event) {
     }
     if (dragObject) {
       bookDragged = books.find((b) => b.getGroup() === dragObject);
-      const bookBox = new THREE.Box3().setFromObject(dragObject);
-      scene.add(new THREE.Box3Helper(bookBox, 0x0000ff)); 
       console.log("Started dragging book:", bookDragged);
       controls.enabled = false;
     }
@@ -238,13 +233,15 @@ function onMouseMove(event) {
     // Moving along x axis
     dragObject.position.x = newX;
     if (bookCollidingWithShelves(dragObject)) {
-      console.log("Collision detected on X axis");
+      dragObject.position.x = originalPosition.x;
+    } else if (bookCollidingWithBook(dragObject)) {
       dragObject.position.x = originalPosition.x;
     }
     // Moving along y axis
     dragObject.position.y = newY;
     if (bookCollidingWithShelves(dragObject)) {
-      console.log("Collision detected on Y axis");
+      dragObject.position.y = originalPosition.y;
+    } else if (bookCollidingWithBook(dragObject)) {
       dragObject.position.y = originalPosition.y;
     }
     const nearestShelfTop = findNearestBookshelfTop(
@@ -263,6 +260,20 @@ function onMouseUp() {
   }
 }
 
+function bookCollidingWithBook(bookGroup) {
+  // Get the book bounding box
+  const bookBox = new THREE.Box3().setFromObject(bookGroup);
+  for (const otherBook of books) {
+    const otherBookGroup = otherBook.getGroup();
+    if (otherBookGroup === bookGroup) continue; // Skip self
+    const otherBookBox = new THREE.Box3().setFromObject(otherBookGroup);
+    if (bookBox.intersectsBox(otherBookBox)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function bookCollidingWithShelves(bookGroup) {
   // Find nearest bookshelf
   let nearestShelf = null;
@@ -278,16 +289,6 @@ function bookCollidingWithShelves(bookGroup) {
 
   // Get the shelf bounding box
   const shelfBox = new THREE.Box3().setFromObject(nearestShelf.bookshelf);
-  
-  // Check collision for each part of the book
-  let hasCollision = false;
-  const collisionResults = {
-    frontCover: false,
-    backCover: false,
-    spine: false,
-    pages: false,
-    overall: false
-  };
 
   // Find the book instance to get component references
   const book = books.find((b) => b.getGroup() === bookGroup);
@@ -298,90 +299,7 @@ function bookCollidingWithShelves(bookGroup) {
 
   // Check overall book bounding box
   const bookBox = new THREE.Box3().setFromObject(bookGroup);
-  collisionResults.overall = bookBox.intersectsBox(shelfBox);
-  
-  // Check individual components
-  if (book.frontCover) {
-    const frontCoverBox = new THREE.Box3().setFromObject(book.frontCover);
-    collisionResults.frontCover = frontCoverBox.intersectsBox(shelfBox);
-    if (collisionResults.frontCover) {
-      console.log("🔴 Front cover collision detected");
-      console.log("Front cover box:", frontCoverBox);
-      hasCollision = true;
-    }
-  }
-
-  if (book.backCover) {
-    const backCoverBox = new THREE.Box3().setFromObject(book.backCover);
-    collisionResults.backCover = backCoverBox.intersectsBox(shelfBox);
-    if (collisionResults.backCover) {
-      console.log("🔴 Back cover collision detected");
-      console.log("Back cover box:", backCoverBox);
-      hasCollision = true;
-    }
-  }
-
-  if (book.spine) {
-    const spineBox = new THREE.Box3().setFromObject(book.spine);
-    collisionResults.spine = spineBox.intersectsBox(shelfBox);
-    if (collisionResults.spine) {
-      console.log("🔴 Spine collision detected");
-      console.log("Spine box:", spineBox);
-      hasCollision = true;
-    }
-  }
-
-  if (book.pages) {
-    const pagesBox = new THREE.Box3().setFromObject(book.pages);
-    collisionResults.pages = pagesBox.intersectsBox(shelfBox);
-    if (collisionResults.pages) {
-      console.log("🔴 Pages collision detected");
-      console.log("Pages box:", pagesBox);
-      hasCollision = true;
-    }
-  }
-
-  if (hasCollision) {
-    console.log("📊 Collision Summary:", collisionResults);
-    console.log("📐 Book dimensions:", {
-      width: book.width,
-      height: book.height,
-      thickness: book.thickness
-    });
-    console.log("📍 Book position:", bookGroup.position);
-    console.log("🔄 Book rotation:", bookGroup.rotation);
-    console.log("📦 Book bounding box:", bookBox);
-    console.log("🏠 Shelf bounding box:", shelfBox);
-    
-    // Add visual debug helpers for colliding components
-    const debugColor = 0xff0000;
-    if (collisionResults.frontCover && book.frontCover) {
-      const frontBox = new THREE.Box3().setFromObject(book.frontCover);
-      const helper = new THREE.Box3Helper(frontBox, debugColor);
-      scene.add(helper);
-      setTimeout(() => scene.remove(helper), 2000); // Remove after 2 seconds
-    }
-    if (collisionResults.backCover && book.backCover) {
-      const backBox = new THREE.Box3().setFromObject(book.backCover);
-      const helper = new THREE.Box3Helper(backBox, debugColor);
-      scene.add(helper);
-      setTimeout(() => scene.remove(helper), 2000);
-    }
-    if (collisionResults.spine && book.spine) {
-      const spineBox = new THREE.Box3().setFromObject(book.spine);
-      const helper = new THREE.Box3Helper(spineBox, debugColor);
-      scene.add(helper);
-      setTimeout(() => scene.remove(helper), 2000);
-    }
-    if (collisionResults.pages && book.pages) {
-      const pagesBox = new THREE.Box3().setFromObject(book.pages);
-      const helper = new THREE.Box3Helper(pagesBox, debugColor);
-      scene.add(helper);
-      setTimeout(() => scene.remove(helper), 2000);
-    }
-  }
-
-  return hasCollision;
+  return bookBox.intersectsBox(shelfBox);
 }
 // Add event listeners for drag functionality
 renderer.domElement.addEventListener("mousedown", onMouseDown);
